@@ -74,7 +74,8 @@ module ArchSpec
       def own_method_call?(graph, edge)
         return false unless edge.receiver == :none && edge.from_constant
 
-        methods, = graph.effective_instance_methods(edge.from_constant)
+        owner = edge.resolved_receiver || edge.from_constant
+        methods, = graph.effective_methods(owner, edge.receiver_scope || :instance)
         methods.include?(edge.to.to_sym)
       end
     end

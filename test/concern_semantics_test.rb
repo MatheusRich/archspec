@@ -252,7 +252,34 @@ class ConcernSemanticsTest < ArchSpecTest
     end
   end
 
+  def test_callback_calls_resolve_against_the_consumer_api
+    with_project do |root|
+      write "#{root}/lib/owned.rb", <<~RUBY
+        module Owned
+          extend ActiveSupport::Concern
+          included do
+            def session = :own
+            def local = session
+            def forbidden = params
+          end
+        end
+        class Record
+          include Owned
+        end
+      RUBY
+      definition = ArchSpec.define do
+        component :concerns, constants: 'Owned'
+        component :library, in: 'lib/**/*.rb'
+        concerns.cannot_call :session, :params, receiver: :none
+      end
+      diagnostics = diagnostics_for(definition, root)
+      assert_equal ['concerns must not call #params'], diagnostics.map(&:message)
+      assert_equal 6, diagnostics.first.location.line
+    end
+  end
+
   private
+
 
   def analyze_library(root)
     definition = ArchSpec.define { component :library, in: 'lib/**/*.rb' }

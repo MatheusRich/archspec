@@ -6,13 +6,14 @@ module ArchSpec
   # methods are installed on the consumer. No application code is executed.
   class ConcernSemantics
     ModuleBody = Data.define(:name, :path, :body)
-    Callback = Data.define(:kind, :methods, :mixins)
+    Callback = Data.define(:kind, :methods, :mixins, :calls)
     MIXINS = { includes: :include, prepends: :prepend, extends: :extend }.freeze
 
     def initialize
       @modules = []
       @callbacks = Hash.new { |hash, key| hash[key] = [] }
       @dependencies = Hash.new { |hash, key| hash[key] = [] }
+      @callback_calls = []
     end
 
     def record_module(name, path, body)
@@ -34,6 +35,7 @@ module ArchSpec
         graph.expose_instance_methods("#{name}::ClassMethods", as_owner: name, scope: :class)
       end
       graph.clear_method_caches
+      apply_callback_receivers
     end
 
     private
@@ -126,7 +128,11 @@ module ArchSpec
                          .map { |statement| SourceLocation.from_prism(mod.path, statement.location) }
       certain_methods = methods.select { |method| direct.any? { |span| within?(span, method.location) } }
       certain_mixins = mixins.select { |edge| direct.any? { |span| within?(span, edge.location) } }
-      @callbacks[mod.name] << Callback.new(node.name, certain_methods, certain_mixins)
+      calls = graph.edges.select do |edge|
+        edge.type == :calls_named_method && edge.receiver == :none && edge.from_constant == mod.name &&
+          (direct.include?(edge.location) || certain_methods.any? { |method| within?(method.location, edge.location) })
+      end
+      @callbacks[mod.name] << Callback.new(node.name, certain_methods, certain_mixins, calls)
       return if methods == certain_methods && mixins == certain_mixins
 
       graph.add_edge(type: :dynamic_feature, from_path: mod.path, from_constant: mod.name,
@@ -193,6 +199,19 @@ module ArchSpec
           end
         end
         callback.methods.each { |method| install_callback_method(consumer, method, origin) }
+        callback.calls.each do |edge|
+          method = callback.methods.find { |definition| within?(definition.location, edge.location) }
+          @callback_calls << [edge, consumer.name, method ? method.scope : :class]
+        end
+      end
+    end
+
+    def apply_callback_receivers
+      originals = @callback_calls.map(&:first).to_set
+      graph.edges.reject! { |edge| originals.include?(edge) }
+      @callback_calls.uniq.each do |edge, receiver, scope|
+        graph.edges << edge.with(resolved_receiver: receiver, receiver_scope: scope,
+          resolved_method: graph.resolve_method_alias(receiver, edge.to, scope))
       end
     end
 
