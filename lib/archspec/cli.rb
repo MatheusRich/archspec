@@ -4,7 +4,7 @@ require 'optparse'
 
 module ArchSpec
   # The <tt>archspec</tt> command line. Backs the +exe/archspec+ executable and
-  # dispatches the +init+, +check+, +explain+, and +version+ subcommands.
+  # dispatches the +init+, +check+, +explain+, +reflect+, and +version+ subcommands.
   #
   #   archspec init
   #   archspec check [PATHS...] [--config PATH] [--format text|json] [--update-todo]
@@ -36,6 +36,8 @@ module ArchSpec
         check(argv, output)
       when 'explain'
         explain(argv, output)
+      when 'reflect'
+        reflect(argv, output)
       when 'version', '--version', '-v'
         raise UsageError, "unexpected argument: #{argv.first}" if argv.any?
 
@@ -58,7 +60,7 @@ module ArchSpec
     def help(argv, output)
       subject = argv.shift
       raise UsageError, "unexpected argument: #{argv.first}" if argv.any?
-      if subject && !%w[init check explain version].include?(subject)
+      if subject && !%w[init check explain reflect version].include?(subject)
         raise UsageError, "unknown command: #{subject}"
       end
 
@@ -193,6 +195,33 @@ module ArchSpec
       raise Error, "could not load #{config_path}: #{detail}"
     end
 
+    def reflect(argv, output)
+      options = { config: CONFIG_FILE, environment: ENV.fetch('RAILS_ENV', 'development'), help: false }
+      parser = OptionParser.new do |opts|
+        opts.banner = usage('reflect')
+        opts.on('--config PATH', 'Use a different architecture file') { |value| options[:config] = value }
+        opts.on('--environment NAME', 'Rails environment to boot (default: RAILS_ENV or development)') do |value|
+          options[:environment] = value
+        end
+        opts.on('-h', '--help', 'Show this help') { options[:help] = true }
+      end
+      parser.parse!(argv)
+      if options[:help]
+        output.puts parser
+        return 0
+      end
+      raise UsageError, "unexpected argument: #{argv.first}" if argv.any?
+
+      definition, root = load_definition(options[:config])
+      unless definition.facts_path
+        raise Error, "no facts configured; add `facts \"archspec_facts\"` to #{options[:config]}"
+      end
+      output.print RailsReflector.run(config_path: options[:config], root: root,
+        output_path: File.join(File.expand_path(definition.facts_path, root), 'rails.yml'),
+        environment: options[:environment])
+      0
+    end
+
     def scope_to_paths(diagnostics, paths, root)
       return diagnostics if paths.empty?
 
@@ -229,6 +258,8 @@ module ArchSpec
         'Usage: archspec check [PATHS...] [--config PATH] [--format text|json] [--update-todo]'
       when 'explain'
         'Usage: archspec explain PATH_OR_CONSTANT [--config PATH]'
+      when 'reflect'
+        'Usage: archspec reflect [--config PATH] [--environment NAME]'
       when 'version'
         'Usage: archspec version'
       when ''
@@ -237,6 +268,7 @@ module ArchSpec
             archspec init [PATH] [--force]
             archspec check [PATHS...] [--config PATH] [--format text|json] [--update-todo]
             archspec explain PATH_OR_CONSTANT [--config PATH]
+            archspec reflect [--config PATH] [--environment NAME]
             archspec version
             archspec help [COMMAND]
         TEXT

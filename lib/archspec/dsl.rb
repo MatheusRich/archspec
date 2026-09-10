@@ -66,6 +66,13 @@ module ArchSpec
         self.todo_path = path.to_s
       end
 
+      # Loads versioned reference and generated-method facts from this
+      # directory. Producing Rails facts is an explicit runtime operation:
+      # <tt>archspec reflect</tt>. Normal checks only read the snapshots.
+      def facts(path = 'archspec_facts')
+        self.facts_path = path.to_s
+      end
+
       # Yields each subdirectory matching a glob, so you can declare one
       # component per engine or pack without hardcoding their names. Paths
       # resolve against the +Archspec.rb+ directory, not the working directory,

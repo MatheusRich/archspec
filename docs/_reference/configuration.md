@@ -24,6 +24,12 @@ with `source "app/**/*.rb", "lib/**/*.{rb,rake}"` or a component such as
 
 Todo ids are computed from the rule, path, message, and evidence, not the line number, so entries survive edits that shift code.
 
+Opt into externally produced association or generated-method facts with
+`facts "archspec_facts"`. `check` and `explain` read the directory's `.yml`
+snapshots without running the application. `archspec reflect` explicitly boots
+Rails to produce `rails.yml`. Missing or stale configured snapshots fail the
+check. See [Association reflection]({% link _guides/association-reflection.md %}).
+
 ## Components
 
 ```ruby

@@ -14,7 +14,7 @@ After reading this guide, you will know:
 
 ## The Pipeline
 
-ArchSpec never loads or executes your application. [Rubydex](https://github.com/Shopify/rubydex)
+`archspec check` never loads or executes your application. [Rubydex](https://github.com/Shopify/rubydex)
 builds a resolved semantic index, while [Prism](https://github.com/ruby/prism)
 records the few facts whose exact syntax matters. Everything downstream is
 plain data:
@@ -22,6 +22,10 @@ plain data:
 ```text
 glob files -> parse syntax -> resolve semantics -> merge facts -> assign components -> evaluate rules
 ```
+
+The optional [`archspec reflect` command]({% link _guides/association-reflection.md %})
+boots Rails separately to record resolved association facts. Checks consume
+those snapshots as data and reject them when their source inputs change.
 
 1. **Collect.** The patterns from `source` (defaulting to `app/**/*.rb`,
    `lib/**/*.rb`, and pack/engine paths) are globbed from the project
@@ -120,6 +124,6 @@ ArchSpec records these as `dynamic_feature` facts with confidence
 diagnostic carries the evidence it was derived from, so you can verify a
 report against the source line it points to.
 
-Because ArchSpec only indexes code and never loads it, checks need no Rails
+Because checks only index code and never load it, they need no Rails
 boot, no database, and have no side effects. They are safe to run in CI, in
 a git hook, or after an AI-assisted change.

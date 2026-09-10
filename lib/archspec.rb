@@ -8,6 +8,7 @@ require_relative 'archspec/component_spec'
 require_relative 'archspec/model'
 require_relative 'archspec/definition'
 require_relative 'archspec/todo'
+require_relative 'archspec/facts'
 require_relative 'archspec/dsl'
 require_relative 'archspec/rubydex_index'
 require_relative 'archspec/concern_semantics'
@@ -27,13 +28,16 @@ require_relative 'archspec/formatters/text'
 require_relative 'archspec/formatters/json'
 require_relative 'archspec/formatters/explanation'
 require_relative 'archspec/cli'
+require_relative 'archspec/rails_reflector'
 
 # ArchSpec turns your application's architecture into executable checks.
 #
 # You describe components, dependencies, and boundaries in an +Archspec.rb+
 # file written in the ArchSpec::DSL, then run <tt>archspec check</tt> to verify
 # every change. ArchSpec indexes Ruby source with Rubydex, uses Prism for a
-# handful of syntax-specific facts, and never boots the app.
+# handful of syntax-specific facts, and never boots the app during checks.
+# The opt-in <tt>archspec reflect</tt> command boots Rails separately to
+# capture resolved association facts for later static checks.
 #
 # The DSL is the public API. An +Archspec.rb+ file is evaluated directly:
 #

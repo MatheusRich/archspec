@@ -18,7 +18,7 @@ Battle tested in [<picture><source media="(prefers-color-scheme: dark)" srcset="
 
 ---
 
-ArchSpec turns your architecture into executable checks: components, layers, constant references, inheritance, mixins, named method calls, method protocols, naming conventions, cycles, and Rails boundaries. It is plain static analysis: Rubydex builds the semantic index, Prism supplies a small syntax overlay, the app never boots, and no AI is involved in checking your code.
+ArchSpec turns your architecture into executable checks: components, layers, constant references, inheritance, mixins, named method calls, method protocols, naming conventions, cycles, and Rails boundaries. Checking is plain static analysis: Rubydex builds the semantic index, Prism supplies a small syntax overlay, the app never boots during a check, and no AI is involved in checking your code.
 
 ## Why ArchSpec?
 
@@ -122,6 +122,7 @@ architecture :cqrs,
 ## What It Checks
 
 - **Dependencies:** allowed and forbidden references between components, in both directions
+- **Rails associations:** opt-in runtime reflection supplies resolved references for subsequent static checks
 - **Privacy:** other components must go through a component's public API
 - **Concerns:** a concern must not depend on the classes that include it
 - **Layers:** dependency direction and cycles
@@ -176,6 +177,13 @@ bundle exec archspec check --format json
 bundle exec archspec check --update-todo
 bundle exec archspec explain app/models/user.rb
 ```
+
+To check dependencies expressed through Rails associations, add
+`facts "archspec_facts"` to `Archspec.rb`, then run
+`bundle exec archspec reflect --environment test`. This command explicitly boots
+Rails and captures its resolved associations. Ordinary checks read the snapshot
+without booting the app, and reject stale snapshots after source or configuration
+changes. See the [association reflection guide](https://archspecrb.dev/association-reflection/).
 
 `explain` shows why a file or constant belongs to a component, its resolved
 ancestry, outgoing facts, incoming dependencies, and anything the analysis

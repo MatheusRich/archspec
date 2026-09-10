@@ -7,7 +7,7 @@ module ArchSpec
   module Analyzer
     extend self
 
-    def analyze(definition, root:)
+    def analyze(definition, root:, include_facts: true)
       root = File.expand_path(root)
       graph = Graph.new(root)
       paths = ruby_files(definition, root)
@@ -28,6 +28,7 @@ module ArchSpec
       index.populate(graph)
       syntax.apply(graph, call_resolutions: index.call_resolutions)
       syntax.apply_concerns(graph)
+      Facts.load_into(graph, definition.facts_path) if include_facts && definition.facts_path
       graph.assign_components(definition.component_specs.values)
       graph
     end

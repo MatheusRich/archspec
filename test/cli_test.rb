@@ -26,6 +26,22 @@ class CLITest < ArchSpecTest
     assert_match(/archspec: error: unknown command: frobnicate/, error.string)
   end
 
+  def test_reflection_help_does_not_need_an_application
+    output = StringIO.new
+    assert_equal 0, ArchSpec::CLI.run(['reflect', '--help'], output: output, error: StringIO.new)
+    assert_match(/--environment/, output.string)
+  end
+
+  def test_reflection_requires_explicit_facts_configuration
+    with_project do |root|
+      write "#{root}/Archspec.rb", "component :models, in: 'app/models/**/*.rb'\n"
+      error = StringIO.new
+      assert_equal 1, ArchSpec::CLI.run(['reflect', '--config', "#{root}/Archspec.rb"], output: StringIO.new, error: error)
+      assert_match(/no facts configured/, error.string)
+      refute_path_exists "#{root}/archspec_facts"
+    end
+  end
+
   def test_help_is_returned_without_exiting_the_caller
     output = StringIO.new
 

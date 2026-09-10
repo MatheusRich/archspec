@@ -74,6 +74,24 @@ bundle exec archspec check --update-todo
 
 Writes the current violations to the configured todo file. Use this for existing apps, not for accepting new regressions. Parse errors are never written to the todo; a file that does not parse has to be fixed.
 
+## reflect
+
+```sh
+bundle exec archspec reflect --environment test
+bundle exec archspec reflect --config config/architecture.rb --environment test
+```
+
+Requires `facts "archspec_facts"` in the architecture configuration. This is an
+explicit runtime command: it runs `bin/rails runner`, eager loads the application,
+and writes resolved Active Record associations to `archspec_facts/rails.yml`.
+The default environment is `RAILS_ENV`, or `development` when unset.
+
+Regenerate after source, configuration, or dependency changes. Failed reflection
+preserves the previous snapshot. Polymorphic, unresolved, and ambiguous
+associations are reported as analysis gaps. See
+[Association reflection]({% link _guides/association-reflection.md %}) for the
+format, staleness contract, and custom producers.
+
 ## explain
 
 ```sh

@@ -197,7 +197,7 @@ class ConcernSemanticsTest < ArchSpecTest
         end
       RUBY
       runtime = Module.new
-      runtime.module_eval(File.read(path), path)
+      capture_io { runtime.module_eval(File.read(path), path) }
       record = runtime.const_get(:Record)
       graph = analyze_library(root)
       methods, = graph.effective_method_definitions('Record', :instance)
