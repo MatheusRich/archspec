@@ -3,6 +3,46 @@
 require 'test_helper'
 
 class AnalyzerTest < ArchSpecTest
+  def test_rake_sources_report_dependencies_and_honor_ignores
+    with_project do |root|
+      write "#{root}/app/models/user.rb", "class User; end\n"
+      write "#{root}/lib/tasks/cleanup.rake", "task :cleanup do\n  User.delete_all\nend\n"
+      write "#{root}/lib/tasks/ignored.rake", "User.delete_all\n"
+      write "#{root}/lib/tasks/template.erb", '<%= User.count %>'
+
+      definition = ArchSpec.define do
+        source 'app/**/*.rb', 'lib/tasks/**/*'
+        ignore 'lib/tasks/ignored.rake'
+        component :models, in: 'app/models/**/*.rb'
+        component :tasks, in: 'lib/tasks/**/*.rake'
+        tasks.cannot_use :models
+      end
+
+      graph = ArchSpec::Analyzer.analyze(definition, root: root)
+      diagnostics = ArchSpec::Evaluator.evaluate(definition, graph)
+
+      assert_equal %w[app/models/user.rb lib/tasks/cleanup.rake], graph.files.values.map(&:relative_path)
+      assert_equal ['dependencies.forbid'], diagnostics.map(&:rule)
+      assert_equal 2, diagnostics.first.location.line
+      assert_equal 3, diagnostics.first.location.column
+      assert_equal 'lib/tasks/cleanup.rake references User', diagnostics.first.evidence
+    end
+  end
+
+  def test_rake_component_patterns_select_files_and_report_syntax_errors
+    with_project do |root|
+      write "#{root}/lib/tasks/broken.rake", "task :broken do\n"
+      definition = ArchSpec.define do
+        component :tasks, in: 'lib/tasks/**/*.rake'
+      end
+
+      diagnostics = diagnostics_for(definition, root)
+      refute_empty diagnostics
+      assert diagnostics.all? { |diagnostic| diagnostic.rule == 'parser.syntax' }
+      assert diagnostics.all? { |diagnostic| diagnostic.location.path.end_with?('/broken.rake') }
+    end
+  end
+
   def test_compact_class_paths_join_the_enclosing_namespace
     with_project do |root|
       write "#{root}/app/controllers/admin/users/roles_controller.rb", <<~RUBY

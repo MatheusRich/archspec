@@ -17,6 +17,11 @@ todo "archspec_todo.yml"
 ```
 {: data-title="Archspec.rb"}
 
+ArchSpec analyzes `.rb` and `.rake` files matched by source or component
+patterns. The default source patterns select `.rb` files; opt into Rake tasks
+with `source "app/**/*.rb", "lib/**/*.{rb,rake}"` or a component such as
+`component :tasks, in: "lib/tasks/**/*.rake"`. Ignore patterns apply to both.
+
 Todo ids are computed from the rule, path, message, and evidence, not the line number, so entries survive edits that shift code.
 
 ## Components
