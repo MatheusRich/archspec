@@ -48,6 +48,30 @@ jobs:
       - name: Build gem
         run: gem build archspec.gemspec
 
+  test_musl:
+    name: Test Ruby 3.4 on Alpine (musl)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Test from the source gem on musl
+        run: |
+          docker run --rm \
+            --volume "$PWD:/workspace" \
+            --workdir /workspace \
+            --env BUNDLE_PATH=/tmp/bundle \
+            --env BUNDLE_DISABLE_SHARED_GEMS=true \
+            --env BUNDLE_FORCE_RUBY_PLATFORM=true \
+            ruby:3.4-alpine sh -elc '
+              apk add --no-cache build-base cargo git
+              bundle install
+              find lib test -name "*.rb" -print0 | xargs -0 -n1 ruby -c
+              ruby -c exe/archspec
+              bundle exec rake test
+              bundle exec rake architecture
+              gem build archspec.gemspec
+            '
+
   torture:
     name: Torture against Fizzy
     runs-on: ubuntu-latest
@@ -161,7 +185,7 @@ jobs:
 
   release:
     name: Release gem
-    needs: [test, docs, torture, torture_apps]
+    needs: [test, test_musl, docs, torture, torture_apps]
     if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
     uses: ./.github/workflows/release.yml
     permissions:

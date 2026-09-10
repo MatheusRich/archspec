@@ -14,7 +14,7 @@ After reading this guide, you will know:
 
 ## The Pipeline
 
-ArchSpec never loads or executes your application. [Rubydex](https://github.com/rubyide/rubydex)
+ArchSpec never loads or executes your application. [Rubydex](https://github.com/Shopify/rubydex)
 builds a resolved semantic index, while [Prism](https://github.com/ruby/prism)
 records the few facts whose exact syntax matters. Everything downstream is
 plain data:
