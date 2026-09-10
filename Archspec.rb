@@ -7,6 +7,7 @@ component :public_api, in: 'lib/archspec.rb'
 component :cli, in: 'lib/archspec/cli.rb'
 component :analysis, in: %w[
   lib/archspec/analyzer.rb
+  lib/archspec/concern_semantics.rb
   lib/archspec/evaluator.rb
 ]
 component :domain, in: %w[

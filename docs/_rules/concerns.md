@@ -33,4 +33,19 @@ end
 
 A concern that names its includer couples the two and defeats the point of extracting it. Passing behavior through the instance, such as `self` or a method the includer defines, does not trigger the rule.
 
+Modules that explicitly `extend ActiveSupport::Concern` receive Rails concern
+semantics. `class_methods` blocks and nested `ClassMethods` modules provide the
+consumer's class API; naming checks classify those methods in `scope: :class`.
+Their signatures and visibility participate in protocol checks on consumers.
+
+An `include`, `prepend`, or `extend` directly inside `included` or `prepended`
+runs on the consumer, and does not make the concern itself an includer.
+ArchSpec applies the matching callback and follows dependencies between
+concerns. Constant references keep their Ruby lexical scope. Ordinary modules
+and direct module-body mixins retain ordinary Ruby behavior.
+
+This analysis does not execute callbacks. Conditional mixins and method
+definitions inside callbacks remain analysis gaps; it does not choose a runtime
+branch or infer methods from arbitrary callback execution.
+
 The `:rails_strict` and `:vanilla_rails` architectures apply this to `app/**/concerns/**/*.rb`. Override the glob with `concerns:`, or pass `concerns: false` to skip it.

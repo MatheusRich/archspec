@@ -27,6 +27,7 @@ module ArchSpec
       index = RubydexIndex.new(paths, syntax: syntax, method_names: method_names)
       index.populate(graph)
       syntax.apply(graph, call_resolutions: index.call_resolutions)
+      syntax.apply_concerns(graph)
       graph.assign_components(definition.component_specs.values)
       graph
     end
@@ -221,6 +222,7 @@ module ArchSpec
         @superclass_overrides = {}
         @superclass_fallbacks = {}
         @method_owner_overrides = []
+        @concerns = ConcernSemantics.new
       end
 
       def scan(path, node)
@@ -268,6 +270,10 @@ module ArchSpec
 
       def declaration_kind(name, path)
         @declaration_kinds[[normalize(name), path]]
+      end
+
+      def apply_concerns(graph)
+        @concerns.apply(graph)
       end
 
       def declaration_name(name, path = nil, location = nil)
@@ -393,6 +399,7 @@ module ArchSpec
         end
 
         location = SourceLocation.from_prism(path, node.location)
+        @concerns.record_module(name, path, node.body)
         record_namespace(
           name,
           path,

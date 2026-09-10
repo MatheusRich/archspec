@@ -86,7 +86,8 @@ module ArchSpec
       @mixins = {
         include: Set.new,
         prepend: Set.new,
-        extend: Set.new
+        extend: Set.new,
+        singleton_prepend: Set.new
       }
     end
 
@@ -212,6 +213,7 @@ module ArchSpec
       @analysis_diagnostics = []
       @effective_definition_cache = {}
       @effective_method_cache = {}
+      @method_exposures = {}
     end
 
     def add_file(path:, parse_errors:, suppressions: [])
@@ -281,13 +283,24 @@ module ArchSpec
       component = components[name.to_sym]
       return [] unless component
 
-      constants_for_component(name).flat_map(&:method_definitions)
+      expose_method_definitions(constants_for_component(name).flat_map(&:method_definitions))
     end
 
     # Every method definition in the graph, across all constants. Used by
     # project-wide naming rules that are not scoped to one component.
     def method_definitions
-      constants.flat_map(&:method_definitions)
+      expose_method_definitions(constants.flat_map(&:method_definitions))
+    end
+
+    # A module can supply an API on another object's class side while its
+    # actual instance methods remain available for ordinary Ruby lookup.
+    def expose_instance_methods(name, as_owner:, scope:)
+      @method_exposures[name] = [as_owner, scope]
+    end
+
+    def clear_method_caches
+      @effective_definition_cache.clear
+      @effective_method_cache.clear
     end
 
     def assign_components(component_specs)
@@ -411,7 +424,11 @@ module ArchSpec
       ancestors = Set.new
       unresolved = Set.new
       nodes.each do |node|
-        mixins = scope == :class ? node.mixins[:extend] : node.mixins[:prepend] | node.mixins[:include]
+        mixins = if scope == :class
+                   node.mixins[:singleton_prepend] | node.mixins[:extend]
+                 else
+                   node.mixins[:prepend] | node.mixins[:include]
+                 end
         mixins.each do |ancestor|
           resolved = resolve_constant_reference(ancestor, node.name, lexical_nesting: [node.name] + node.nesting)
           ancestors.add(resolved)
@@ -461,9 +478,8 @@ module ArchSpec
       visible_names = Set.new
       unresolved = Set.new
 
-      if scope == :instance
-        append_mixin_definitions(nodes, :prepend, definitions, visible_names, unresolved, visited)
-      end
+      prepend_kind = scope == :class ? :singleton_prepend : :prepend
+      append_mixin_definitions(nodes, prepend_kind, definitions, visible_names, unresolved, visited)
 
       own = nodes.flat_map { |node| node.method_definitions.select { |definition| definition.scope == scope } }
       append_visible_definitions(definitions, visible_names, own)
@@ -554,6 +570,13 @@ module ArchSpec
     end
 
     private
+
+    def expose_method_definitions(definitions)
+      definitions.map do |definition|
+        exposure = @method_exposures[definition.owner] if definition.scope == :instance
+        exposure ? definition.with(owner: exposure.first, scope: exposure.last) : definition
+      end
+    end
 
     def append_mixin_definitions(nodes, kind, definitions, visible_names, unresolved, visited)
       mixins = nodes.flat_map do |node|

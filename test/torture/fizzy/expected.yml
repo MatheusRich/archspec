@@ -1,6 +1,8 @@
 ---
 sha: 65bb2f8ff2cc84d9836cd03ba857f3a20552a78a
 rules:
-  concerns.independence: 1
+  # Storage::Totaled reaches Account and Board through their Storage concerns.
+  # Its explicit Account/Board references are real transitive dependencies.
+  concerns.independence: 3
   dependencies.forbid: 1
   naming.forbidden: 2
