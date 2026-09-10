@@ -42,6 +42,10 @@ jobs:
       - name: Run tests
         run: bundle exec rake test
 
+      - name: Test issue assessment state
+        if: matrix.ruby-version == '4.0'
+        run: node --test .github/tests/*.test.cjs
+
       - name: Run architecture checks
         run: bundle exec rake architecture
 

@@ -8,99 +8,34 @@ on:
   discussion:
     types: [created]
   workflow_dispatch:
+    inputs:
+      force:
+        description: Retry an assessment even if an older run already added a marker
+        type: boolean
+        default: false
   roles: all
   permissions:
-    discussions: write
-    issues: write
+    contents: read
+    discussions: read
+    issues: read
   steps:
-    - name: Skip or mark the Copilot assessment
+    - uses: actions/checkout@v7
+      with:
+        sparse-checkout: .github/scripts
+    - name: Skip completed assessments
       id: assessment_needed
       if: vars.COPILOT_ISSUE_ASSESSMENT_ENABLED == 'true'
       continue-on-error: true
       uses: actions/github-script@v9
       with:
         script: |
-          let routed = {};
-          try {
-            routed = JSON.parse(context.payload.inputs?.aw_context || "{}");
-          } catch (error) {
-            core.setFailed(`Invalid agentic workflow context: ${error.message}`);
-            return;
-          }
-
-          const itemType = context.payload.issue
-            ? "issue"
-            : context.payload.discussion
-              ? "discussion"
-              : routed.item_type;
-          const itemNumber = context.payload.issue?.number
-            || context.payload.discussion?.number
-            || routed.item_number;
-
-          if (!["issue", "discussion"].includes(itemType) || !itemNumber) {
-            core.setFailed("An issue or discussion number is required");
-            return;
-          }
-
-          let reactions;
-          let discussionId;
-          if (itemType === "issue") {
-            reactions = await github.paginate(
-              github.rest.reactions.listForIssue,
-              { ...context.repo, issue_number: itemNumber, per_page: 100 },
-            );
-          } else {
-            const result = await github.graphql(
-              `query($owner: String!, $repo: String!, $number: Int!) {
-                repository(owner: $owner, name: $repo) {
-                  discussion(number: $number) {
-                    id
-                    reactions(first: 100, content: ROCKET) {
-                      nodes { content user { login } }
-                    }
-                  }
-                }
-              }`,
-              { ...context.repo, number: Number(itemNumber) },
-            );
-            const discussion = result.repository.discussion;
-            if (!discussion) {
-              core.setFailed(`Discussion #${itemNumber} was not found`);
-              return;
-            }
-            discussionId = discussion.id;
-            reactions = discussion.reactions.nodes || [];
-          }
-
-          const trustedActors = new Set([context.repo.owner, "github-actions[bot]"]);
-          const alreadyAssessed = reactions.some(reaction =>
-            reaction.content.toLowerCase() === "rocket"
-              && trustedActors.has(reaction.user?.login),
-          );
-
-          if (alreadyAssessed) {
-            core.setFailed(`${itemType} #${itemNumber} was already assessed`);
-            return;
-          }
-
-          if (itemType === "issue") {
-            await github.rest.reactions.createForIssue({
-              ...context.repo,
-              issue_number: itemNumber,
-              content: "rocket",
-            });
-          } else {
-            await github.graphql(
-              `mutation($subjectId: ID!) {
-                addReaction(input: {subjectId: $subjectId, content: ROCKET}) {
-                  reaction { content }
-                }
-              }`,
-              { subjectId: discussionId },
-            );
+          const { assessmentNeeded } = require('./.github/scripts/assessment-state.cjs');
+          if (!await assessmentNeeded(github, context)) {
+            core.setFailed('This item was already assessed');
           }
 
 concurrency:
+  job-discriminator: ${{ github.run_id }}
   group: issue-assessment-${{ github.event.issue.number || github.event.discussion.number || fromJSON(github.event.inputs.aw_context || '{}').item_number || github.run_id }}
   cancel-in-progress: false
 
@@ -114,8 +49,9 @@ permissions:
 engine: copilot
 
 tools:
-  bash: false
-  cli-proxy: false
+  # The CLI bridge avoids the Copilot/MCP gateway protocol negotiation failure.
+  bash: ["github:*", "safeoutputs:*"]
+  cli-proxy: true
   github:
     allowed-repos:
       - crmne/archspec
@@ -126,6 +62,38 @@ tools:
       - repos
 
 safe-outputs:
+  jobs:
+    complete-assessment:
+      description: Mark the triggering report assessed after its safe outputs succeed
+      runs-on: ubuntu-latest
+      needs: safe_outputs
+      inputs:
+        outcome:
+          description: A short description of the completed assessment
+          type: string
+          required: true
+      permissions:
+        contents: read
+        discussions: write
+        issues: write
+      env:
+        ASSESSMENT_FAILED: ${{ needs.safe_outputs.outputs.process_safe_outputs_items_failed }}
+        ASSESSMENT_SUCCEEDED: ${{ needs.safe_outputs.outputs.process_safe_outputs_items_succeeded }}
+      steps:
+        - uses: actions/checkout@v7
+          with:
+            sparse-checkout: .github/scripts
+        - name: Record successful assessment
+          uses: actions/github-script@v9
+          with:
+            script: |
+              const fs = require('node:fs');
+              const { markAssessed } = require('./.github/scripts/assessment-state.cjs');
+              const output = JSON.parse(fs.readFileSync(process.env.GH_AW_AGENT_OUTPUT, 'utf8'));
+              await markAssessed(github, context, output, {
+                failed: process.env.ASSESSMENT_FAILED,
+                succeeded: process.env.ASSESSMENT_SUCCEEDED,
+              });
   add-labels:
     issue-intent: true
     allowed:
@@ -205,5 +173,11 @@ chain-of-thought or internal analysis.
 - Never post a technical design, implementation plan, triage table, heading,
   or generic status summary.
 
-When no public reply is necessary, use the `noop` safe output after applying
-any justified labels.
+Use the `github` and `safeoutputs` CLI tools on PATH for reads and safe outputs.
+If no label, comment, or closure is needed, call `safeoutputs noop` with the
+assessment outcome. Do not emit `noop` after another public action.
+
+After completing the assessment and requesting all its safe outputs, call
+`safeoutputs complete_assessment` with an `outcome` as the final action. This records completion
+only after those outputs succeed. If a tool or infrastructure failure prevents
+assessment, report it with `report_incomplete` and do not request completion.
