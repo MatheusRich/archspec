@@ -46,7 +46,11 @@ permissions:
   discussions: read
   issues: read
 
-engine: copilot
+engine:
+  id: copilot
+  # 1.0.83 cannot list tools through the gateway's legacy MCP transport.
+  version: 1.0.80
+  args: ["--no-auto-update"]
 
 tools:
   # The CLI bridge avoids the Copilot/MCP gateway protocol negotiation failure.
