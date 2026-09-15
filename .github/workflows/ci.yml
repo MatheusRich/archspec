@@ -63,7 +63,7 @@ jobs:
             --env BUNDLE_DISABLE_SHARED_GEMS=true \
             --env BUNDLE_FORCE_RUBY_PLATFORM=true \
             ruby:3.4-alpine sh -elc '
-              apk add --no-cache build-base cargo git
+              apk add --no-cache build-base cargo clang-dev git
               bundle install
               find lib test -name "*.rb" -print0 | xargs -0 -n1 ruby -c
               ruby -c exe/archspec
