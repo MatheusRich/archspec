@@ -1,28 +1,23 @@
-# Issue assessment
+# Issue triage
 
-The source workflow is `workflows/issue-assessment.md`. After changing it,
-regenerate its committed lock file with `gh aw compile issue-assessment`.
-Run `node --test .github/tests/*.test.cjs` to check completion and retry behavior.
+[Copilot Triage](https://github.com/crmne/copilot-triage) assesses new and
+reopened issues and new discussions. It adds up to two labels and can ask for
+one missing fact or answer from the configured documentation and source files.
+It reads the report and latest five comments. Maintainers handle duplicates,
+closure, and removing obsolete labels. Comments do not trigger model calls.
 
-The agent uses the `github` and `safeoutputs` CLI bridges. Shell access is
-limited to those commands. This avoids the native Copilot MCP client's protocol
-negotiation failure with the gateway while preserving read-only GitHub access
-and reviewed safe outputs.
+Edit `triage.yml` for labels, replies, sources, and response policy. The action
+is pinned in `workflows/issue-assessment.yml`; its regression tests live in the
+shared repository. Keep `COPILOT_ISSUE_ASSESSMENT_ENABLED=true` and configure the
+`COPILOT_GITHUB_TOKEN` secret to enable it.
 
-A rocket reaction marks a completed assessment. The activation check only reads
-reactions; the completion job adds the marker after the requested safe outputs
-succeed. Empty outputs, missing tools, incomplete assessments, or failed writes
-do not mark an item complete. The agent must request `complete_assessment` as its
-last safe output.
-
-Older failed runs may already have added a rocket before they failed. Once the
-updated workflow is on the default branch, retry one with:
+To reassess an issue without publishing changes:
 
 ```sh
-gh workflow run issue-assessment.lock.yml \
-  -f force=true \
-  -f 'aw_context={"item_type":"issue","item_number":24}'
+gh workflow run issue-assessment.yml -f kind=issue -f number=123 -f dry_run=true
 ```
 
-Replace `24` with the report number. Only a manual dispatch can bypass a marker.
-Keep automatic failure reporting enabled so transport failures remain visible.
+Use `kind=discussion` for a discussion or `dry_run=false` to apply the result.
+Unchanged prompts reuse cached answers. A party-popper reaction marks a
+completed assessment, including one needing no reply. Bot-authored reports
+are skipped; model failures stay in the job summary.
