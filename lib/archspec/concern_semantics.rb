@@ -160,7 +160,6 @@ module ArchSpec
       graph.add_edge(type: :dynamic_feature, from_path: mod.path, from_constant: mod.name,
                      to: "conditional #{node.name} callback", location: location,
                      confidence: :unknown_due_to_dynamic_feature)
-      @concern_edges[mod.name] << (graph.edges.size - 1)
     end
 
     def extract_methods(mod, location)
