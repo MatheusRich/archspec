@@ -56,7 +56,11 @@ module ArchSpec
     end
 
     def install_consumers
-      events = graph.edges.select { |edge| MIXINS.key?(edge.type) }.group_by { |edge| [edge.from_constant, edge.from_path] }
+      mixin_edges = graph.edges.select { |edge| MIXINS.key?(edge.type) }
+      @installed_mixins = mixin_edges.to_set do |edge|
+        [edge.from_constant, edge.from_path, edge.type, graph.resolve_edge_constant(edge)]
+      end
+      events = mixin_edges.group_by { |edge| [edge.from_constant, edge.from_path] }
       events.each do |(name, path), edges|
         next if @concerns.include?(name)
         next unless edges.any? do |edge|
@@ -229,10 +233,7 @@ module ArchSpec
     def add_mixin(consumer, kind, target, origin)
       consumer.add_mixin(kind, target)
       type = kind == :singleton_prepend ? :extends : MIXINS.key(kind)
-      return if graph.edges.any? do |edge|
-        edge.from_constant == consumer.name && edge.from_path == consumer.path &&
-          edge.type == type && graph.resolve_edge_constant(edge) == target
-      end
+      return unless @installed_mixins.add?([consumer.name, consumer.path, type, target])
 
       graph.add_edge(type: type, from_constant: consumer.name, from_path: consumer.path,
                      to: target, resolved_to: target, location: origin.location)
