@@ -137,10 +137,12 @@ module ArchSpec
     def defer_callback(mod, node, location)
       methods = extract_methods(mod, location)
       owned = owned_edges(mod.name)
-      mixins = owned.filter_map do |_, edge|
-        edge if MIXINS.key?(edge.type) && within?(location, edge.location)
+      mixins = owned.filter_map do |index, edge|
+        next unless MIXINS.key?(edge.type) && within?(location, edge.location)
+
+        @removed_edges.add(index)
+        edge
       end
-      owned.each { |index, edge| @removed_edges.add(index) if mixins.include?(edge) }
       statements = node.block.body.is_a?(Prism::StatementsNode) ? node.block.body.body : []
       direct = statements.select do |statement|
         statement.is_a?(Prism::DefNode) ||
